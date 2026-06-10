@@ -287,7 +287,7 @@ def shopify_status(x_api_key: str = Header(None)):
 # --- Dashboard ---
 @app.get("/", response_class=HTMLResponse)
 def dashboard():
-    html_path = Path(__file__).parent / "static" / "dashboard.html"
+    html_path = Path(__file__).parent / "dashboard.html"
     return HTMLResponse(html_path.read_text())
 
 @app.get("/health")
