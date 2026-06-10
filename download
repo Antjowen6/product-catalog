@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Product Catalog</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --border: #e7e5e4;
+    --text: #1c1917;
+    --text-muted: #78716c;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --green: #16a34a;
+    --amber: #d97706;
+    --red: #dc2626;
+    --radius: 6px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+
+  .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+  .header h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .header .stats { display: flex; gap: 20px; font-size: 13px; color: var(--text-muted); }
+  .header .stats strong { color: var(--text); font-weight: 600; }
+
+  .toolbar { padding: 16px 24px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .toolbar input, .toolbar select {
+    padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+    font-size: 13px; background: var(--surface); color: var(--text);
+  }
+  .toolbar input:focus, .toolbar select:focus { outline: none; border-color: var(--accent); }
+  .toolbar input { width: 240px; }
+  .btn { padding: 7px 14px; border: none; border-radius: var(--radius); font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--border); }
+
+  .table-wrap { padding: 0 24px 24px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; font-size: 13px; }
+  th { text-align: left; padding: 10px 14px; font-weight: 500; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; background: #f5f5f4; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafaf9; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+  .badge-active { background: #dcfce7; color: var(--green); }
+  .badge-draft { background: #fef3c7; color: var(--amber); }
+  .badge-archived { background: #fee2e2; color: var(--red); }
+  .badge-shopify { background: #dbeafe; color: var(--accent); }
+
+  .sku-cell { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; color: var(--accent); cursor: pointer; }
+  .sku-cell:hover { text-decoration: underline; }
+  .price { font-family: 'SF Mono', 'Fira Code', monospace; }
+  .photo-thumb { width: 32px; height: 32px; border-radius: 4px; object-fit: cover; background: var(--border); }
+  .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border-radius: 8px; padding: 24px; width: 440px; max-width: 90vw; max-height: 85vh; overflow-y: auto; }
+  .modal h2 { font-size: 16px; margin-bottom: 16px; }
+  .modal label { display: block; font-size: 12px; font-weight: 500; color: var(--text-muted); margin: 10px 0 4px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .modal input, .modal select, .modal textarea { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 13px; font-family: inherit; }
+  .modal textarea { resize: vertical; min-height: 60px; }
+  .modal .actions { margin-top: 18px; display: flex; gap: 8px; justify-content: flex-end; }
+
+  .api-key-bar { padding: 8px 24px; background: #fffbeb; border-bottom: 1px solid #fde68a; font-size: 12px; color: var(--amber); display: none; }
+  .api-key-bar code { background: #fef3c7; padding: 2px 6px; border-radius: 3px; font-family: monospace; user-select: all; }
+</style>
+</head>
+<body>
+
+<div class="api-key-bar" id="apiKeyBar">
+  API Key: <code id="apiKeyDisplay"></code> — save this, you'll need it for API calls
+</div>
+
+<div class="header">
+  <h1>Product Catalog</h1>
+  <div class="stats">
+    <span><strong id="totalCount">0</strong> products</span>
+    <span><strong id="activeCount">0</strong> active</span>
+    <span><strong id="shopifyCount">0</strong> in Shopify</span>
+  </div>
+</div>
+
+<div class="toolbar">
+  <input type="text" id="searchInput" placeholder="Search by name, SKU, or description…" />
+  <select id="statusFilter">
+    <option value="">All statuses</option>
+    <option value="active">Active</option>
+    <option value="draft">Draft</option>
+    <option value="archived">Archived</option>
+  </select>
+  <button class="btn btn-primary" onclick="openModal()">+ Add product</button>
+  <button class="btn btn-ghost" onclick="loadProducts()">Refresh</button>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th></th>
+        <th>SKU</th>
+        <th>Name</th>
+        <th>Supplier</th>
+        <th>Price</th>
+        <th>Status</th>
+        <th>Shopify</th>
+        <th>Updated</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="productTable">
+      <tr><td colspan="9" class="empty">Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h2 id="modalTitle">Add product</h2>
+    <label>SKU</label>
+    <input type="text" id="fSku" placeholder="e.g. PB-FIBRE-500" />
+    <label>Name</label>
+    <input type="text" id="fName" placeholder="Product name" />
+    <label>Supplier</label>
+    <input type="text" id="fSupplier" placeholder="Supplier name" />
+    <label>Price</label>
+    <input type="number" id="fPrice" step="0.01" placeholder="0.00" />
+    <label>Status</label>
+    <select id="fStatus">
+      <option value="draft">Draft</option>
+      <option value="active">Active</option>
+      <option value="archived">Archived</option>
+    </select>
+    <label>Description</label>
+    <textarea id="fDescription" placeholder="Product description…"></textarea>
+    <label>Photo URL</label>
+    <input type="text" id="fPhoto" placeholder="https://…" />
+    <label style="display:flex;align-items:center;gap:6px;margin-top:12px;text-transform:none;font-size:13px;color:var(--text)">
+      <input type="checkbox" id="fShopify" /> In Shopify
+    </label>
+    <div class="actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveProduct()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // API key is entered once per session via prompt
+  let API_KEY = localStorage.getItem('catalog_api_key') || '';
+  if (!API_KEY) {
+    API_KEY = prompt('Enter your API key:') || '';
+    if (API_KEY) localStorage.setItem('catalog_api_key', API_KEY);
+  }
+
+  const BASE = window.location.origin;
+  let editingSku = null;
+
+  async function api(path, opts = {}) {
+    const res = await fetch(BASE + path, {
+      ...opts,
+      headers: { 'Content-Type': 'application/json', 'X-Api-Key': API_KEY, ...(opts.headers || {}) },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || res.statusText);
+    }
+    return res.json();
+  }
+
+  async function loadProducts() {
+    const search = document.getElementById('searchInput').value;
+    const status = document.getElementById('statusFilter').value;
+    let qs = '?';
+    if (search) qs += `search=${encodeURIComponent(search)}&`;
+    if (status) qs += `status=${encodeURIComponent(status)}&`;
+
+    try {
+      const products = await api('/products' + qs);
+      renderTable(products);
+    } catch (e) {
+      document.getElementById('productTable').innerHTML = `<tr><td colspan="9" class="empty">${e.message}</td></tr>`;
+    }
+  }
+
+  function renderTable(products) {
+    const tbody = document.getElementById('productTable');
+    document.getElementById('totalCount').textContent = products.length;
+    document.getElementById('activeCount').textContent = products.filter(p => p.status === 'active').length;
+    document.getElementById('shopifyCount').textContent = products.filter(p => p.in_shopify).length;
+
+    if (!products.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="empty">No products yet. Add one above.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = products.map(p => `
+      <tr>
+        <td>${p.photo_url ? `<img class="photo-thumb" src="${esc(p.photo_url)}" alt="" />` : '<div class="photo-thumb"></div>'}</td>
+        <td class="sku-cell" onclick="editProduct('${esc(p.sku)}')">${esc(p.sku)}</td>
+        <td><strong>${esc(p.name)}</strong></td>
+        <td>${esc(p.supplier)}</td>
+        <td class="price">$${Number(p.price).toFixed(2)}</td>
+        <td><span class="badge badge-${p.status}">${p.status}</span></td>
+        <td>${p.in_shopify ? '<span class="badge badge-shopify">Yes</span>' : '—'}</td>
+        <td style="color:var(--text-muted);font-size:12px">${p.updated_at ? p.updated_at.slice(0,10) : ''}</td>
+        <td><button class="btn btn-ghost" onclick="deleteProduct('${esc(p.sku)}')">×</button></td>
+      </tr>
+    `).join('');
+  }
+
+  function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  function openModal(product) {
+    editingSku = product ? product.sku : null;
+    document.getElementById('modalTitle').textContent = product ? 'Edit product' : 'Add product';
+    document.getElementById('fSku').value = product?.sku || '';
+    document.getElementById('fSku').disabled = !!product;
+    document.getElementById('fName').value = product?.name || '';
+    document.getElementById('fSupplier').value = product?.supplier || '';
+    document.getElementById('fPrice').value = product?.price || '';
+    document.getElementById('fStatus').value = product?.status || 'draft';
+    document.getElementById('fDescription').value = product?.description || '';
+    document.getElementById('fPhoto').value = product?.photo_url || '';
+    document.getElementById('fShopify').checked = product?.in_shopify || false;
+    document.getElementById('modalOverlay').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('open');
+    editingSku = null;
+  }
+
+  async function saveProduct() {
+    const data = {
+      sku: document.getElementById('fSku').value.trim(),
+      name: document.getElementById('fName').value.trim(),
+      supplier: document.getElementById('fSupplier').value.trim(),
+      price: parseFloat(document.getElementById('fPrice').value) || 0,
+      status: document.getElementById('fStatus').value,
+      description: document.getElementById('fDescription').value.trim(),
+      photo_url: document.getElementById('fPhoto').value.trim(),
+      in_shopify: document.getElementById('fShopify').checked,
+    };
+    if (!data.sku || !data.name) { alert('SKU and Name are required.'); return; }
+
+    try {
+      if (editingSku) {
+        const { sku, ...updates } = data;
+        await api(`/products/${encodeURIComponent(editingSku)}`, { method: 'PATCH', body: JSON.stringify(updates) });
+      } else {
+        await api('/products', { method: 'POST', body: JSON.stringify(data) });
+      }
+      closeModal();
+      loadProducts();
+    } catch (e) { alert('Error: ' + e.message); }
+  }
+
+  async function editProduct(sku) {
+    try {
+      const p = await api(`/products/${encodeURIComponent(sku)}`);
+      openModal(p);
+    } catch (e) { alert(e.message); }
+  }
+
+  async function deleteProduct(sku) {
+    if (!confirm(`Delete product ${sku}?`)) return;
+    try {
+      await api(`/products/${encodeURIComponent(sku)}`, { method: 'DELETE' });
+      loadProducts();
+    } catch (e) { alert(e.message); }
+  }
+
+  // Live search
+  let debounce;
+  document.getElementById('searchInput').addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(loadProducts, 300); });
+  document.getElementById('statusFilter').addEventListener('change', loadProducts);
+
+  // Init
+  loadProducts();
+</script>
+</body>
+</html>
